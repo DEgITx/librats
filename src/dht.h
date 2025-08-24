@@ -292,7 +292,7 @@ private:
     
     // Ping-before-replace eviction management
     void initiate_ping_verification(const DhtNode& candidate_node, const DhtNode& node_to_ping, int bucket_index);
-    void handle_ping_verification_response(const std::string& transaction_id, const Peer& responder);
+    void handle_ping_verification_response(const std::string& transaction_id, const NodeId& responder_id, const Peer& responder);
     void cleanup_stale_ping_verifications();
     void perform_replacement(const DhtNode& candidate_node, const DhtNode& node_to_replace, int bucket_index);
     

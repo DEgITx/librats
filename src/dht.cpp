@@ -559,7 +559,7 @@ void DhtClient::handle_krpc_response(const KrpcMessage& message, const Peer& sen
     LOG_DHT_DEBUG("Handling KRPC response from " << sender.ip << ":" << sender.port);
     
     // Check if this is a ping verification response before normal processing
-    handle_ping_verification_response(message.transaction_id, sender);
+    handle_ping_verification_response(message.transaction_id, message.response_id, sender);
     
     // Add responder to routing table
     KrpcNode krpc_node(message.response_id, sender.ip, sender.port);
@@ -1119,22 +1119,20 @@ void DhtClient::initiate_ping_verification(const DhtNode& candidate_node, const 
     send_krpc_message(message, node_to_ping.peer);
 }
 
-void DhtClient::handle_ping_verification_response(const std::string& transaction_id, const Peer& responder) {
+void DhtClient::handle_ping_verification_response(const std::string& transaction_id, const NodeId& responder_id, const Peer& responder) {
     std::lock_guard<std::mutex> lock(pending_pings_mutex_);
     
     auto it = pending_pings_.find(transaction_id);
     if (it != pending_pings_.end()) {
         const auto& verification = it->second;
         
-        // Check if the responder matches the node we pinged
-        if (responder.ip == verification.node_to_ping.peer.ip && 
-            responder.port == verification.node_to_ping.peer.port) {
-            
+        // Check if the responder node ID matches the node we pinged
+        if (responder_id == verification.node_to_ping.id) {
             LOG_DHT_DEBUG("Ping verification successful for node " << node_id_to_hex(verification.node_to_ping.id) 
                           << " - keeping existing node in routing table");
             
             // The pinged node responded, so it's still alive - don't replace it
-            // Just update its last_seen timestamp
+            // Just update its last_seen timestamp and peer info
             {
                 std::lock_guard<std::mutex> routing_lock(routing_table_mutex_);
                 auto& bucket = routing_table_[verification.bucket_index];
@@ -1144,12 +1142,13 @@ void DhtClient::handle_ping_verification_response(const std::string& transaction
                                            });
                 if (node_it != bucket.end()) {
                     node_it->last_seen = std::chrono::steady_clock::now();
-                    node_it->peer = responder;  // Update peer info in case it changed
+                    node_it->peer = responder;  // Update peer info in case IP/port changed
                 }
             }
         } else {
-            LOG_DHT_WARN("Ping verification response from unexpected peer " << responder.ip << ":" << responder.port 
-                         << " (expected " << verification.node_to_ping.peer.ip << ":" << verification.node_to_ping.peer.port << ")");
+            LOG_DHT_WARN("Ping verification response from unexpected node " << node_id_to_hex(responder_id) 
+                         << " at " << responder.ip << ":" << responder.port 
+                         << " (expected node " << node_id_to_hex(verification.node_to_ping.id) << ")");
         }
         
         // Remove the pending ping verification
