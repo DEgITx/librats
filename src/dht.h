@@ -218,7 +218,7 @@ private:
               ping_sent_at(std::chrono::steady_clock::now()), transaction_id(trans_id) {}
     };
     std::unordered_map<std::string, PingVerification> pending_pings_;  // transaction_id -> PingVerification
-    std::mutex pending_pings_mutex_;
+    mutable std::mutex pending_pings_mutex_;
     
     // Network thread
     std::thread network_thread_;
