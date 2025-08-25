@@ -266,6 +266,7 @@ void DhtClient::maintenance_loop() {
     LOG_DHT_DEBUG("Maintenance loop started");
     
     auto last_bucket_refresh = std::chrono::steady_clock::now();
+    auto last_ping_verification_cleanup = std::chrono::steady_clock::now();
     auto last_general_cleanup = std::chrono::steady_clock::now();
     
     while (running_) {
@@ -286,9 +287,6 @@ void DhtClient::maintenance_loop() {
             // Cleanup stale announced peers
             cleanup_stale_announced_peers();
             
-            // Cleanup stale ping verifications
-            cleanup_stale_ping_verifications();
-            
             last_general_cleanup = now;
         }
         
@@ -298,7 +296,11 @@ void DhtClient::maintenance_loop() {
             last_bucket_refresh = now;
         }
         
-
+        // Frequent maintenance: ping verifications time out at ~30s, so check often
+        if (now - last_ping_verification_cleanup >= std::chrono::seconds(30)) {
+            cleanup_stale_ping_verifications();
+            last_ping_verification_cleanup = now;
+        }
         
         // Execute maintenance loop every 5 seconds
         {
